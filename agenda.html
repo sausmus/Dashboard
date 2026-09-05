@@ -207,7 +207,7 @@
         </div>
       </div>
       <div class="period-tabs" id="periodTabs"></div>
-      <div class="shared-message" id="sharedMessage">✓ This agenda is being used for all periods.</div>
+      <div class="shared-message" id="sharedMessage">✓ This agenda is being used for all active periods.</div>
     </div>
 
     <div class="card agenda-card">
@@ -266,19 +266,22 @@
   <div class="settings-overlay" id="periodSettingsOverlay" aria-hidden="true">
     <div class="settings-modal" role="dialog" aria-modal="true" aria-labelledby="periodSettingsTitle">
       <div class="settings-modal-header">
-        <div class="settings-modal-title" id="periodSettingsTitle">Period Settings</div>
+        <div class="settings-modal-title" id="periodSettingsTitle">Dashboard Class Settings</div>
         <button class="settings-close" id="periodSettingsClose" type="button" aria-label="Close settings">×</button>
       </div>
 
       <div class="settings-modal-body">
         <p class="settings-description">
-          Choose which periods appear in the Agenda. Hiding a period does not delete any saved agenda data.
+          Choose which classes are active across the Teacher Dashboard. Changes made here also update Dashboard Settings. Hiding a class does not delete any saved agenda data.
         </p>
         <div class="period-visibility-list" id="periodVisibilityList"></div>
       </div>
 
       <div class="settings-modal-footer">
-        <button class="button" id="showAllPeriodsButton" type="button">Show All</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="button" id="showAllPeriodsButton" type="button">Show All</button>
+          <a class="button" href="settings.html" style="text-decoration:none;display:inline-flex;align-items:center">Dashboard Settings</a>
+        </div>
         <button class="button primary" id="savePeriodSettingsButton" type="button">Done</button>
       </div>
     </div>
@@ -286,6 +289,7 @@
 
   <button id="exitPresent">Exit Full Screen</button>
 
+<script src="shared/dashboard-data.js"></script>
 <script>
 const schedules={
   regular:[
@@ -303,11 +307,11 @@ const schedules={
 };
 
 const STORAGE_PREFIX="bjhAgenda_v1_";
-const PERIOD_SETTINGS_KEY="bjhAgendaVisiblePeriods_v1";
+const LEGACY_PERIOD_SETTINGS_KEY="bjhAgendaVisiblePeriods_v1";
 let visiblePeriods=loadVisiblePeriods();
 let weekMonday=getMonday(new Date());
 let selectedDate=chooseInitialDate();
-let selectedPeriod=detectInitialPeriod();
+let selectedPeriod=chooseInitialPeriod();
 let activeEditor=null;
 let savedRange=null;
 
@@ -353,38 +357,189 @@ function getDayData(date=selectedDate){const key=STORAGE_PREFIX+dateKey(date),st
 function saveDayData(data,date=selectedDate){localStorage.setItem(STORAGE_PREFIX+dateKey(date),JSON.stringify(data));showSaved()}
 function showSaved(){saveStatus.textContent="Saving...";clearTimeout(showSaved.timer);showSaved.timer=setTimeout(()=>saveStatus.textContent="Saved",350)}
 
-function loadVisiblePeriods(){
+function dashboardDataAvailable(){
+  return !!(
+    window.DashboardData &&
+    typeof DashboardData.getClasses === "function" &&
+    typeof DashboardData.updateClass === "function"
+  );
+}
+
+function getSharedClasses(){
+  if(dashboardDataAvailable()){
+    try{
+      const classes=DashboardData.getClasses();
+      if(Array.isArray(classes)&&classes.length)return classes;
+    }catch(error){
+      console.error("Could not read Dashboard classes:",error);
+    }
+  }
+
+  // Standalone fallback: Agenda still works if shared/dashboard-data.js is not present.
+  let legacyVisible=[1,2,3,4,5,6,7];
   try{
-    const stored=JSON.parse(localStorage.getItem(PERIOD_SETTINGS_KEY));
+    const stored=JSON.parse(localStorage.getItem(LEGACY_PERIOD_SETTINGS_KEY));
     if(Array.isArray(stored)){
       const cleaned=[...new Set(stored.map(Number).filter(n=>n>=1&&n<=7))].sort((a,b)=>a-b);
-      if(cleaned.length)return cleaned;
+      if(cleaned.length)legacyVisible=cleaned;
     }
-  }catch(e){console.error(e)}
-  return [1,2,3,4,5,6,7];
+  }catch(error){
+    console.error(error);
+  }
+
+  return Array.from({length:7},(_,index)=>{
+    const id=String(index+1);
+    return{
+      id,
+      name:`Period ${id}`,
+      active:legacyVisible.includes(Number(id)),
+      students:[]
+    };
+  });
 }
-function saveVisiblePeriods(){localStorage.setItem(PERIOD_SETTINGS_KEY,JSON.stringify(visiblePeriods))}
-function ensureSelectedPeriodVisible(){if(!visiblePeriods.includes(selectedPeriod))selectedPeriod=visiblePeriods[0]||1}
+
+function loadVisiblePeriods(){
+  const cleaned=getSharedClasses()
+    .filter(item=>item&&item.active)
+    .map(item=>Number(item.id))
+    .filter(n=>n>=1&&n<=7)
+    .sort((a,b)=>a-b);
+
+  return cleaned.length?cleaned:[1];
+}
+
+function getClassInfo(period){
+  const id=String(period);
+  return getSharedClasses().find(item=>String(item.id)===id)||null;
+}
+
+function getClassDisplayName(period){
+  const item=getClassInfo(period);
+  const name=String(item?.name||"").trim();
+  return name||`Period ${period}`;
+}
+
+function chooseInitialPeriod(){
+  if(dashboardDataAvailable()&&typeof DashboardData.getCurrentClassId==="function"){
+    try{
+      const current=Number(DashboardData.getCurrentClassId());
+      if(visiblePeriods.includes(current))return current;
+    }catch(error){
+      console.error("Could not read Dashboard current class:",error);
+    }
+  }
+
+  const detected=detectInitialPeriod();
+  if(visiblePeriods.includes(detected))return detected;
+  return visiblePeriods[0]||1;
+}
+
+function syncCurrentClass(period){
+  if(!dashboardDataAvailable()||typeof DashboardData.setCurrentClass!=="function")return;
+  if(!visiblePeriods.includes(Number(period)))return;
+
+  try{
+    DashboardData.setCurrentClass(String(period));
+  }catch(error){
+    console.error("Could not update Dashboard current class:",error);
+  }
+}
+
+function saveVisiblePeriods(){
+  if(dashboardDataAvailable()){
+    try{
+      for(const item of DashboardData.getClasses()){
+        const id=Number(item.id);
+        if(id<1||id>7)continue;
+        DashboardData.updateClass(String(item.id),{
+          active:visiblePeriods.includes(id)
+        });
+      }
+      return;
+    }catch(error){
+      console.error("Could not save Dashboard class visibility:",error);
+    }
+  }
+
+  // Standalone fallback only.
+  localStorage.setItem(LEGACY_PERIOD_SETTINGS_KEY,JSON.stringify(visiblePeriods));
+}
+
+function ensureSelectedPeriodVisible(){
+  if(!visiblePeriods.includes(selectedPeriod))selectedPeriod=visiblePeriods[0]||1;
+}
+
 function renderPeriodVisibilitySettings(){
   periodVisibilityList.innerHTML="";
+  const classes=getSharedClasses();
+
   for(let i=1;i<=7;i++){
+    const item=classes.find(entry=>Number(entry.id)===i);
+    const name=String(item?.name||`Period ${i}`).trim()||`Period ${i}`;
+    const defaultName=`Period ${i}`;
+    const display=name===defaultName?defaultName:`${defaultName} — ${name}`;
+
     const label=document.createElement("label");
     label.className="period-visibility-option";
-    label.innerHTML=`<input type="checkbox" value="${i}" ${visiblePeriods.includes(i)?"checked":""}> <span>Period ${i}</span>`;
+    label.innerHTML=`<input type="checkbox" value="${i}" ${visiblePeriods.includes(i)?"checked":""}> <span>${display}</span>`;
     periodVisibilityList.appendChild(label);
   }
 }
-function openPeriodSettings(){renderPeriodVisibilitySettings();periodSettingsOverlay.classList.add("open");periodSettingsOverlay.setAttribute("aria-hidden","false")}
-function closePeriodSettings(){periodSettingsOverlay.classList.remove("open");periodSettingsOverlay.setAttribute("aria-hidden","true")}
+
+function openPeriodSettings(){
+  // Re-read global settings every time the dialog opens.
+  visiblePeriods=loadVisiblePeriods();
+  ensureSelectedPeriodVisible();
+  renderPeriodVisibilitySettings();
+  periodSettingsOverlay.classList.add("open");
+  periodSettingsOverlay.setAttribute("aria-hidden","false");
+}
+
+function closePeriodSettings(){
+  periodSettingsOverlay.classList.remove("open");
+  periodSettingsOverlay.setAttribute("aria-hidden","true");
+}
+
 function applyPeriodSettings(){
-  const checked=[...periodVisibilityList.querySelectorAll('input[type="checkbox"]:checked')].map(input=>Number(input.value)).sort((a,b)=>a-b);
-  if(!checked.length){alert("Please keep at least one period visible.");return}
+  const checked=[...periodVisibilityList.querySelectorAll('input[type="checkbox"]:checked')]
+    .map(input=>Number(input.value))
+    .sort((a,b)=>a-b);
+
+  if(!checked.length){
+    alert("Please keep at least one class visible.");
+    return;
+  }
+
   saveEditors();
   visiblePeriods=checked;
   saveVisiblePeriods();
+
+  // Re-read from the shared layer so Agenda reflects the saved Dashboard state.
+  visiblePeriods=loadVisiblePeriods();
   ensureSelectedPeriodVisible();
+  syncCurrentClass(selectedPeriod);
+
   closePeriodSettings();
   loadEditors();
+}
+
+function refreshFromDashboardSettings(){
+  if(!dashboardDataAvailable())return;
+
+  const nextVisible=loadVisiblePeriods();
+  const changed=JSON.stringify(nextVisible)!==JSON.stringify(visiblePeriods);
+  visiblePeriods=nextVisible;
+
+  const previousSelected=selectedPeriod;
+  ensureSelectedPeriodVisible();
+
+  if(changed||previousSelected!==selectedPeriod){
+    renderPeriodTabs();
+    loadEditors();
+  }else{
+    renderPeriodTabs();
+    updateLabels();
+  }
 }
 
 periodSettingsButton.addEventListener("click",openPeriodSettings);
@@ -393,6 +548,8 @@ showAllPeriodsButton.addEventListener("click",()=>periodVisibilityList.querySele
 savePeriodSettingsButton.addEventListener("click",applyPeriodSettings);
 periodSettingsOverlay.addEventListener("click",event=>{if(event.target===periodSettingsOverlay)closePeriodSettings()});
 document.addEventListener("keydown",event=>{if(event.key==="Escape"&&periodSettingsOverlay.classList.contains("open"))closePeriodSettings()});
+window.addEventListener("focus",refreshFromDashboardSettings);
+window.addEventListener("storage",refreshFromDashboardSettings);
 
 function loadEditors(){const data=getDayData();sharedToggle.checked=data.shared;if(data.shared){agendaEditor.innerHTML=data.sharedAgenda||"";homeworkEditor.innerHTML=data.sharedHomework||"";sharedMessage.style.display="block"}else{const p=data.periods[selectedPeriod];agendaEditor.innerHTML=p.agenda||"";homeworkEditor.innerHTML=p.homework||"";sharedMessage.style.display="none"}updateLabels();renderPeriodTabs()}
 function saveEditors(){const data=getDayData();if(data.shared){data.sharedAgenda=agendaEditor.innerHTML;data.sharedHomework=homeworkEditor.innerHTML}else{data.periods[selectedPeriod]={agenda:agendaEditor.innerHTML,homework:homeworkEditor.innerHTML}}saveDayData(data)}
@@ -406,9 +563,31 @@ document.getElementById("nextWeek").addEventListener("click",()=>{saveEditors();
 document.getElementById("thisWeek").addEventListener("click",()=>{saveEditors();selectedDate=chooseInitialDate();weekMonday=getMonday(selectedDate);dateJump.value=dateKey(selectedDate);renderWeek();loadEditors()});
 dateJump.addEventListener("change",()=>{if(!dateJump.value)return;saveEditors();selectedDate=parseDateKey(dateJump.value);weekMonday=getMonday(selectedDate);renderWeek();loadEditors()});
 
-function renderPeriodTabs(){periodTabs.innerHTML="";ensureSelectedPeriodVisible();for(const i of visiblePeriods){const b=document.createElement("button");b.className="period-button";b.textContent=`Period ${i}`;if(i===selectedPeriod)b.classList.add("active");b.addEventListener("click",()=>{saveEditors();selectedPeriod=i;renderPeriodTabs();loadEditors()});periodTabs.appendChild(b)}}
+function renderPeriodTabs(){
+  periodTabs.innerHTML="";
+  ensureSelectedPeriodVisible();
+
+  for(const i of visiblePeriods){
+    const b=document.createElement("button");
+    b.className="period-button";
+    b.textContent=getClassDisplayName(i);
+    b.title=`Period ${i}`;
+
+    if(i===selectedPeriod)b.classList.add("active");
+
+    b.addEventListener("click",()=>{
+      saveEditors();
+      selectedPeriod=i;
+      syncCurrentClass(i);
+      renderPeriodTabs();
+      loadEditors();
+    });
+
+    periodTabs.appendChild(b);
+  }
+}
 function detectInitialPeriod(){const now=new Date(),schedule=schedules[defaultScheduleForDate(now)];for(let i=0;i<schedule.length;i++)if(now<todayAt(now,schedule[i].end))return i+1;return 7}
-function updateLabels(){selectedDateTitle.textContent=formatLongDate(selectedDate);const data=getDayData();agendaHeading.textContent=data.shared?"Agenda • All Periods":`Agenda • Period ${selectedPeriod}`}
+function updateLabels(){selectedDateTitle.textContent=formatLongDate(selectedDate);const data=getDayData();agendaHeading.textContent=data.shared?"Agenda • All Active Periods":`Agenda • ${getClassDisplayName(selectedPeriod)}`}
 
 agendaEditor.addEventListener("focus",()=>activeEditor=agendaEditor);
 homeworkEditor.addEventListener("focus",()=>activeEditor=homeworkEditor);
@@ -490,7 +669,22 @@ document.getElementById("backupButton").addEventListener("click",()=>{saveEditor
 document.getElementById("restoreButton").addEventListener("click",()=>document.getElementById("restoreFile").click());
 document.getElementById("restoreFile").addEventListener("change",event=>{const file=event.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=()=>{try{const backup=JSON.parse(reader.result);if(!backup.data||typeof backup.data!=="object")throw new Error("Invalid backup");if(!confirm("Restore this Agenda backup? Existing matching dates will be replaced."))return;Object.entries(backup.data).forEach(([key,value])=>{if(key.startsWith(STORAGE_PREFIX))localStorage.setItem(key,value)});loadEditors();renderWeek();alert("Agenda backup restored.")}catch(e){alert("That file does not appear to be a valid BJH Agenda backup.")}};reader.readAsText(file);event.target.value=""});
 
-function initialize(){try{document.execCommand("styleWithCSS",false,true)}catch(_){}visiblePeriods=loadVisiblePeriods();ensureSelectedPeriodVisible();dateJump.value=dateKey(selectedDate);renderWeek();renderPeriodTabs();loadEditors();loadScheduleSelector();updateBellCountdown();setInterval(updateBellCountdown,250)}
+function initialize(){
+  try{document.execCommand("styleWithCSS",false,true)}catch(_){}
+
+  visiblePeriods=loadVisiblePeriods();
+  selectedPeriod=chooseInitialPeriod();
+  ensureSelectedPeriodVisible();
+  syncCurrentClass(selectedPeriod);
+
+  dateJump.value=dateKey(selectedDate);
+  renderWeek();
+  renderPeriodTabs();
+  loadEditors();
+  loadScheduleSelector();
+  updateBellCountdown();
+  setInterval(updateBellCountdown,250);
+}
 initialize();
 </script>
 </body>
