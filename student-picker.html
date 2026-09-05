@@ -11,7 +11,9 @@
   <style>
     * {
       box-sizing: border-box;
-      .dashboard-back {
+    }
+
+    .dashboard-back {
   position: fixed;
   top: 18px;
   left: 18px;
@@ -44,7 +46,6 @@
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
 }
-    }
 
     body {
       margin: 0;
@@ -887,7 +888,7 @@
     <div class="button-row">
 
       <button id="settingsButton">
-        ⚙ Settings
+        ⚙ Dashboard Settings
       </button>
 
       <button id="rosterButton">
@@ -909,7 +910,7 @@
     </div>
 
     <div class="small-note">
-      Rosters, visible periods, and selection pools are remembered on this browser profile.
+      Classes and rosters come from Dashboard Settings. Picker pools, undo history, and generated groups are remembered on this browser profile.
     </div>
 
   </div>
@@ -997,7 +998,7 @@
 
       <p class="small-note" style="margin-top:0; font-size:14px;">
         Paste one student name per line.
-        Your roster will be saved in this browser.
+        Saving here updates the shared Dashboard roster for this class.
       </p>
 
       <textarea
@@ -1065,6 +1066,8 @@ James Martinez"></textarea>
 
 <div id="toast" class="toast"></div>
 
+
+<script src="shared/dashboard-data.js"></script>
 
 <script>
 
@@ -1310,6 +1313,267 @@ James Martinez"></textarea>
 
   let state =
     loadState();
+
+
+  /* =========================================================
+     DASHBOARD SHARED DATA INTEGRATION
+  ========================================================= */
+
+  const SHARED_ROSTER_MIGRATION_KEY =
+    "studentPicker_sharedRosterMigration_v1";
+
+
+  function normalizeSharedNames(names) {
+
+    if (!Array.isArray(names)) {
+      return [];
+    }
+
+    const seen =
+      new Set();
+
+    const cleaned =
+      [];
+
+    names.forEach(value => {
+
+      const name =
+        String(value ?? "")
+          .trim()
+          .replace(/\s+/g, " ");
+
+      if (!name) {
+        return;
+      }
+
+      const key =
+        name.toLocaleLowerCase();
+
+      if (seen.has(key)) {
+        return;
+      }
+
+      seen.add(key);
+
+      cleaned.push(name);
+
+    });
+
+    return cleaned;
+
+  }
+
+
+  function sameNameList(a, b) {
+
+    const left =
+      normalizeSharedNames(a);
+
+    const right =
+      normalizeSharedNames(b);
+
+    if (
+      left.length !==
+      right.length
+    ) {
+      return false;
+    }
+
+    return left.every(
+      (name, index) =>
+        name === right[index]
+    );
+
+  }
+
+
+  function getDashboardClass(period) {
+
+    if (!window.DashboardData) {
+      return null;
+    }
+
+    return DashboardData.getClass(
+      period
+    );
+
+  }
+
+
+  function getClassLabel(period) {
+
+    const classInfo =
+      getDashboardClass(period);
+
+    return (
+      classInfo?.name ||
+      `Period ${period}`
+    );
+
+  }
+
+
+  function syncWithDashboardData() {
+
+    if (!window.DashboardData) {
+
+      console.error(
+        "DashboardData was not found. Make sure shared/dashboard-data.js exists."
+      );
+
+      return;
+
+    }
+
+
+    /*
+      FIRST-RUN MIGRATION:
+      If this older Student Picker already has rosters
+      and the new Dashboard roster is empty, move the
+      old roster into shared Dashboard data one time.
+    */
+
+    const migrationDone =
+      localStorage.getItem(
+        SHARED_ROSTER_MIGRATION_KEY
+      ) === "true";
+
+
+    if (!migrationDone) {
+
+      PERIODS.forEach(period => {
+
+        const sharedRoster =
+          DashboardData.getRoster(
+            period
+          );
+
+        const oldPickerRoster =
+          normalizeSharedNames(
+            state.periods[
+              period
+            ].masterRoster
+          );
+
+        if (
+          sharedRoster.length === 0 &&
+          oldPickerRoster.length > 0
+        ) {
+
+          DashboardData.saveRoster(
+            period,
+            oldPickerRoster
+          );
+
+        }
+
+      });
+
+      localStorage.setItem(
+        SHARED_ROSTER_MIGRATION_KEY,
+        "true"
+      );
+
+    }
+
+
+    /*
+      DASHBOARD SETTINGS now controls
+      which periods are visible here.
+    */
+
+    const activeClasses =
+      DashboardData.getClasses({
+        activeOnly: true
+      });
+
+    state.visiblePeriods =
+      activeClasses.map(
+        classInfo =>
+          classInfo.id
+      );
+
+
+    /*
+      Use the shared Current Class whenever
+      that class is active. Otherwise use
+      the first active class.
+    */
+
+    const sharedCurrent =
+      DashboardData.getCurrentClassId();
+
+    if (
+      state.visiblePeriods.includes(
+        sharedCurrent
+      )
+    ) {
+
+      state.currentPeriod =
+        sharedCurrent;
+
+    }
+
+    else if (
+      state.visiblePeriods.length > 0
+    ) {
+
+      state.currentPeriod =
+        state.visiblePeriods[0];
+
+    }
+
+
+    /*
+      Dashboard master rosters are authoritative.
+      If a roster changed centrally, reset that
+      period's temporary picker pool/history/groups
+      so stale students cannot remain.
+    */
+
+    PERIODS.forEach(period => {
+
+      const data =
+        state.periods[
+          period
+        ];
+
+      const sharedRoster =
+        normalizeSharedNames(
+          DashboardData.getRoster(
+            period
+          )
+        );
+
+      if (
+        !sameNameList(
+          data.masterRoster,
+          sharedRoster
+        )
+      ) {
+
+        data.masterRoster =
+          [...sharedRoster];
+
+        data.pool =
+          [...sharedRoster];
+
+        data.history =
+          [];
+
+        data.groups =
+          [];
+
+      }
+
+    });
+
+    saveState();
+
+  }
+
+
+  syncWithDashboardData();
 
 
   /* =========================================================
@@ -1715,7 +1979,9 @@ James Martinez"></textarea>
           );
 
         button.textContent =
-          `Period ${period}`;
+          getClassLabel(
+            period
+          );
 
         if (
           period ===
@@ -1741,6 +2007,23 @@ James Martinez"></textarea>
 
             pendingStudent =
               null;
+
+            try {
+
+              DashboardData.setCurrentClass(
+                period
+              );
+
+            }
+
+            catch (error) {
+
+              console.error(
+                "Could not update shared current class:",
+                error
+              );
+
+            }
 
             saveState();
 
@@ -1783,7 +2066,9 @@ James Martinez"></textarea>
       );
 
     periodName.textContent =
-      `Period ${state.currentPeriod}`;
+      getClassLabel(
+        state.currentPeriod
+      );
 
     remainingCount.textContent =
       `${remaining} remaining`;
@@ -1808,7 +2093,9 @@ James Martinez"></textarea>
       total === 0;
 
     groupsPeriodName.textContent =
-      `Make Groups — Period ${state.currentPeriod}`;
+      `Make Groups — ${getClassLabel(
+        state.currentPeriod
+      )}`;
 
     groupAvailableCount.textContent =
       `${remaining} student${
@@ -2452,7 +2739,9 @@ James Martinez"></textarea>
       "block";
 
     fullscreenGroupTitle.textContent =
-      `Period ${state.currentPeriod} Groups`;
+      `${getClassLabel(
+        state.currentPeriod
+      )} Groups`;
 
     fullscreenGroupCount.textContent =
       `${data.pool.length} students`;
@@ -2723,7 +3012,9 @@ James Martinez"></textarea>
       currentData();
 
     rosterModalTitle.textContent =
-      `Period ${state.currentPeriod} Roster`;
+      `${getClassLabel(
+        state.currentPeriod
+      )} Roster`;
 
     rosterInput.value =
       data.masterRoster.join(
@@ -2770,6 +3061,11 @@ James Martinez"></textarea>
     const data =
       currentData();
 
+    DashboardData.saveRoster(
+      state.currentPeriod,
+      names
+    );
+
     data.masterRoster =
       names;
 
@@ -2792,7 +3088,7 @@ James Martinez"></textarea>
     updateUI();
 
     showToast(
-      `${names.length} students saved`
+      `${names.length} students saved to Dashboard`
     );
 
   }
@@ -2808,7 +3104,9 @@ James Martinez"></textarea>
       currentData();
 
     poolModalTitle.textContent =
-      `Period ${state.currentPeriod} — ${data.pool.length} Remaining`;
+      `${getClassLabel(
+        state.currentPeriod
+      )} — ${data.pool.length} Remaining`;
 
     poolList.innerHTML =
       "";
@@ -2943,7 +3241,12 @@ James Martinez"></textarea>
 
   settingsButton.addEventListener(
     "click",
-    openSettings
+    () => {
+
+      window.location.href =
+        "settings.html";
+
+    }
   );
 
 
@@ -3138,6 +3441,14 @@ James Martinez"></textarea>
   /* =========================================================
      START APP
   ========================================================= */
+
+  if (!window.DashboardData) {
+
+    alert(
+      "Student Picker could not load shared Dashboard data. Check that shared/dashboard-data.js exists in this repository."
+    );
+
+  }
 
   buildPeriodButtons();
 
