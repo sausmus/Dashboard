@@ -171,17 +171,6 @@
     .winner-preview{background:#fef7e0;color:#7c5900;border-radius:10px;padding:10px 12px;font-weight:700;font-size:13px;min-height:38px}
     .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
 
-    /* ---------- Manage classes ---------- */
-    .manage-class-list{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin-top:14px}
-    .class-toggle{
-      display:flex;align-items:center;gap:10px;border:1px solid #edf0f2;border-radius:11px;
-      padding:12px 13px;background:#fff;cursor:pointer;user-select:none;
-    }
-    .class-toggle:hover{background:#f8f9fa}
-    .class-toggle input{width:18px;height:18px;margin:0;accent-color:var(--blue)}
-    .class-toggle span{font-size:14px;font-weight:700}
-    .manage-note{font-size:12px;color:var(--muted);line-height:1.5;background:#f8f9fa;border-radius:10px;padding:10px 12px}
-
     /* ---------- Presentation mode ---------- */
     body.present-mode{background:#fff;height:100vh;overflow:hidden}
     body.present-mode .app{max-width:1500px;height:100vh;padding:18px 34px 24px;display:flex;flex-direction:column}
@@ -290,7 +279,7 @@
         <button class="button small" id="backupButton">Backup</button>
         <button class="button small" id="restoreButton">Restore</button>
         <input type="file" id="restoreFile" accept=".json" hidden>
-        <button class="button small" id="manageClassesButton">Manage Classes</button>
+        <button class="button small" id="dashboardSettingsButton">Dashboard Settings</button>
         <button class="button small" id="newCompetitionButton">New Competition</button>
         <button class="button small primary" id="presentButton">Show Standings</button>
       </div>
@@ -317,7 +306,7 @@
         </div>
 
         <div class="form-grid">
-          <div class="field-label">Period</div>
+          <div class="field-label">Class</div>
           <select id="periodSelect"></select>
 
           <div class="field-label">Points</div>
@@ -360,7 +349,7 @@
     </div>
 
     <div class="bottom-bar">
-      <div>Every championship is stored separately in this browser. Backup saves the entire year-long record.</div>
+      <div>Every championship is stored separately in this browser. Classes and visibility come from Dashboard Settings.</div>
       <div class="save-status" id="saveStatus">Saved</div>
     </div>
   </div>
@@ -388,7 +377,7 @@
         <thead>
           <tr>
             <th>Rank</th>
-            <th>Period</th>
+            <th>Class</th>
             <th>Game Score</th>
             <th>Season Points</th>
           </tr>
@@ -412,30 +401,8 @@
     </div>
   </div>
 
-  <!-- MANAGE CLASSES MODAL -->
-  <div class="modal-backdrop" id="manageClassesModal" aria-hidden="true">
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="manageClassesModalTitle" style="max-width:560px">
-      <div class="modal-header">
-        <div>
-          <div class="modal-title" id="manageClassesModalTitle">Manage Classes</div>
-          <div class="modal-subtitle">Choose which classes appear throughout the Scoreboard.</div>
-        </div>
-        <button class="icon-button" id="closeManageClassesModal" aria-label="Close">×</button>
-      </div>
 
-      <div class="manage-note">
-        Hidden classes are never deleted. Their scores, history, and old competition results stay saved, so you can turn a class back on later without losing anything. “All Periods” only awards points to classes that are currently visible.
-      </div>
-
-      <div class="manage-class-list" id="manageClassList"></div>
-
-      <div class="modal-actions">
-        <button class="button" id="cancelManageClasses">Cancel</button>
-        <button class="button primary" id="saveManageClasses">Save Classes</button>
-      </div>
-    </div>
-  </div>
-
+<script src="shared/dashboard-data.js"></script>
 <script>
 /* =========================================================
    CLASS CHAMPIONSHIP
@@ -443,7 +410,6 @@
 ========================================================= */
 
 const PERIODS = [1, 2, 3, 4, 5, 6, 7];
-const DEFAULT_ACTIVE_PERIODS = [1, 2, 3, 4, 5, 6, 7];
 const STORAGE_KEY = "bjhScoreboard_v1";
 const SEASON_TITLES = [
   "School Year Championship",
@@ -456,9 +422,8 @@ const SEASON_TITLES = [
 ];
 const DEFAULT_SEASON_TITLE = "Fall Semester Championship";
 const DEFAULT_STATE = {
-  schemaVersion: 3,
+  schemaVersion: 4,
   activeSeason: DEFAULT_SEASON_TITLE,
-  activePeriods: [...DEFAULT_ACTIVE_PERIODS],
   seasons: {}
 };
 
@@ -479,23 +444,17 @@ function loadState(){
     if(Array.isArray(parsed.events)){
       const migratedTitle = SEASON_TITLES.includes(parsed.seasonName) ? parsed.seasonName : DEFAULT_SEASON_TITLE;
       return {
-        schemaVersion: 3,
+        schemaVersion: 4,
         activeSeason: migratedTitle,
-        activePeriods: [...DEFAULT_ACTIVE_PERIODS],
         seasons: {
           [migratedTitle]: {events: parsed.events}
         }
       };
     }
 
-    const storedActivePeriods = Array.isArray(parsed.activePeriods)
-      ? parsed.activePeriods.map(Number).filter(p => PERIODS.includes(p))
-      : [...DEFAULT_ACTIVE_PERIODS];
-
     const next = {
-      schemaVersion: 3,
+      schemaVersion: 4,
       activeSeason: SEASON_TITLES.includes(parsed.activeSeason) ? parsed.activeSeason : DEFAULT_SEASON_TITLE,
-      activePeriods: storedActivePeriods.length ? [...new Set(storedActivePeriods)] : [...DEFAULT_ACTIVE_PERIODS],
       seasons: parsed.seasons && typeof parsed.seasons === "object" ? parsed.seasons : {}
     };
 
@@ -542,15 +501,37 @@ function activeEvents(){
   return activeSeasonData().events;
 }
 
+function getDashboardClass(period){
+  if(!window.DashboardData) return null;
+  return DashboardData.getClass(String(period));
+}
+
+function getClassLabel(period){
+  return getDashboardClass(period)?.name || `Period ${period}`;
+}
+
 function activePeriods(){
-  const saved = Array.isArray(state.activePeriods)
-    ? state.activePeriods.map(Number).filter(p => PERIODS.includes(p))
-    : [];
-  return saved.length ? PERIODS.filter(p => saved.includes(p)) : [...DEFAULT_ACTIVE_PERIODS];
+  if(!window.DashboardData){
+    console.error("DashboardData was not found. Make sure shared/dashboard-data.js exists.");
+    return [...PERIODS];
+  }
+
+  return DashboardData.getClasses({activeOnly:true})
+    .map(item => Number(item.id))
+    .filter(period => PERIODS.includes(period));
 }
 
 function isPeriodActive(period){
   return activePeriods().includes(Number(period));
+}
+
+function syncCurrentClass(period){
+  if(!window.DashboardData || !isPeriodActive(period)) return;
+  try{
+    DashboardData.setCurrentClass(String(period));
+  }catch(error){
+    console.error("Could not update shared current class:", error);
+  }
 }
 
 /* =========================================================
@@ -612,6 +593,15 @@ function renderStandings(){
   const list = document.getElementById("standingsList");
   list.innerHTML = "";
 
+  if(!ranked.length){
+    const empty = document.createElement("div");
+    empty.className = "history-empty";
+    empty.textContent = "No active classes. Turn on classes in Dashboard Settings.";
+    list.appendChild(empty);
+    document.getElementById("leaderCallout").textContent = "🍩 Donut Day Leader: —";
+    return;
+  }
+
   const maxScore = Math.max(...ranked.map(x => x.score), 0);
   const minScore = Math.min(...ranked.map(x => x.score), 0);
   const visualRange = Math.max(maxScore - Math.min(minScore,0), 1);
@@ -633,7 +623,7 @@ function renderStandings(){
 
     const period = document.createElement("div");
     period.className = "period-name";
-    period.textContent = `Period ${item.period}`;
+    period.textContent = getClassLabel(item.period);
 
     const track = document.createElement("div");
     track.className = "bar-track";
@@ -651,7 +641,7 @@ function renderStandings(){
   });
 
   const topScore = ranked[0]?.score ?? 0;
-  const leaders = ranked.filter(x => x.score === topScore).map(x => `Period ${x.period}`);
+  const leaders = ranked.filter(x => x.score === topScore).map(x => getClassLabel(x.period));
   const callout = document.getElementById("leaderCallout");
   const hasVisibleScoring = activeEvents().some(event =>
     activePeriods().some(period => Number(event.changes?.[period] ?? event.changes?.[String(period)] ?? 0) !== 0)
@@ -684,7 +674,7 @@ function renderHistory(){
   if(!events.length){
     const empty = document.createElement("div");
     empty.className = "history-empty";
-    empty.textContent = filter === "all" ? "No scores yet." : `No score changes yet for Period ${filter}.`;
+    empty.textContent = filter === "all" ? "No scores yet." : `No score changes yet for ${getClassLabel(filter)}.`;
     list.appendChild(empty);
     return;
   }
@@ -720,7 +710,7 @@ function renderHistory(){
       if(!value) return;
       const delta = document.createElement("span");
       delta.className = "delta" + (value < 0 ? " negative" : "");
-      delta.textContent = `P${period} ${formatDelta(value)}`;
+      delta.textContent = `${getClassLabel(period)} ${formatDelta(value)}`;
       changesWrap.appendChild(delta);
     });
 
@@ -738,7 +728,7 @@ function renderCompetitions(){
   if(!competitions.length){
     const empty = document.createElement("div");
     empty.className = "no-competitions";
-    empty.textContent = "No competitions recorded yet. Start one when you want to compare all of your visible classes in the same activity.";
+    empty.textContent = "No competitions recorded yet. Start one when you want to compare all of your active classes in the same activity.";
     list.appendChild(empty);
     return;
   }
@@ -765,7 +755,7 @@ function renderCompetitions(){
     winner.className = "competition-winner";
     if(ranking.length){
       const topScore = ranking[0].score;
-      const winners = ranking.filter(x => x.score === topScore).map(x => `Period ${x.period}`);
+      const winners = ranking.filter(x => x.score === topScore).map(x => getClassLabel(x.period));
       winner.textContent = winners.length > 1 ? `🏆 Tie: ${winners.join(" & ")}` : `🏆 ${winners[0]} wins`;
     }else{
       winner.textContent = "No currently visible classes participated";
@@ -773,7 +763,7 @@ function renderCompetitions(){
 
     const scores = document.createElement("div");
     scores.className = "competition-scores";
-    scores.textContent = ranking.length ? ranking.map(x => `P${x.period}: ${x.score}`).join(" · ") : "—";
+    scores.textContent = ranking.length ? ranking.map(x => `${getClassLabel(x.period)}: ${x.score}`).join(" · ") : "—";
 
     tile.append(name,date,winner,scores);
     list.appendChild(tile);
@@ -801,32 +791,61 @@ function renderPeriodControls(){
   const previousPeriod = periodSelect.value;
   const previousFilter = historyFilter.value || "all";
   const visible = activePeriods();
+  const sharedCurrent = window.DashboardData ? String(DashboardData.getCurrentClassId() || "") : "";
 
   periodSelect.innerHTML = "";
+  historyFilter.innerHTML = "";
+
+  const allHistoryOption = document.createElement("option");
+  allHistoryOption.value = "all";
+  allHistoryOption.textContent = "All Classes";
+  historyFilter.appendChild(allHistoryOption);
+
+  if(!visible.length){
+    const emptyOption = document.createElement("option");
+    emptyOption.value = "";
+    emptyOption.textContent = "No active classes";
+    emptyOption.disabled = true;
+    emptyOption.selected = true;
+    periodSelect.appendChild(emptyOption);
+    document.getElementById("addScoreButton").disabled = true;
+    historyFilter.value = "all";
+    return;
+  }
+
   visible.forEach(period => {
     const option = document.createElement("option");
     option.value = period;
-    option.textContent = `Period ${period}`;
+    option.textContent = getClassLabel(period);
     periodSelect.appendChild(option);
   });
+
   const addAllOption = document.createElement("option");
   addAllOption.value = "all";
-  addAllOption.textContent = "All Periods";
+  addAllOption.textContent = "All Classes";
   periodSelect.appendChild(addAllOption);
-  periodSelect.value = visible.map(String).includes(previousPeriod) || previousPeriod === "all" ? previousPeriod : String(visible[0]);
 
-  historyFilter.innerHTML = "";
-  const allOption = document.createElement("option");
-  allOption.value = "all";
-  allOption.textContent = "All Periods";
-  historyFilter.appendChild(allOption);
+  const visibleStrings = visible.map(String);
+  if(previousPeriod === "all" || visibleStrings.includes(previousPeriod)){
+    periodSelect.value = previousPeriod;
+  }else if(visibleStrings.includes(sharedCurrent)){
+    periodSelect.value = sharedCurrent;
+  }else{
+    periodSelect.value = String(visible[0]);
+  }
+
   visible.forEach(period => {
     const option = document.createElement("option");
     option.value = period;
-    option.textContent = `Period ${period}`;
+    option.textContent = getClassLabel(period);
     historyFilter.appendChild(option);
   });
-  historyFilter.value = previousFilter === "all" || visible.map(String).includes(previousFilter) ? previousFilter : "all";
+
+  historyFilter.value = previousFilter === "all" || visibleStrings.includes(previousFilter)
+    ? previousFilter
+    : "all";
+
+  document.getElementById("addScoreButton").disabled = false;
 }
 
 document.getElementById("reasonInput").addEventListener("keydown", event => {
@@ -837,6 +856,12 @@ document.getElementById("customPoints").addEventListener("keydown", event => {
 });
 
 document.getElementById("addScoreButton").addEventListener("click", addScore);
+
+periodSelect.addEventListener("change", () => {
+  if(periodSelect.value !== "all" && periodSelect.value){
+    syncCurrentClass(periodSelect.value);
+  }
+});
 
 function addScore(){
   const selectedPeriod = periodSelect.value;
@@ -851,12 +876,13 @@ function addScore(){
 
   if(selectedPeriod === "all"){
     activePeriods().forEach(period => changes[period] = points);
-    toastLabel = `All visible periods ${formatDelta(points)} points each`;
+    toastLabel = `All visible classes ${formatDelta(points)} points each`;
   }else{
     const period = Number(selectedPeriod);
     if(!isPeriodActive(period)) return showToast("Choose a visible class.");
+    syncCurrentClass(period);
     changes[period] = points;
-    toastLabel = `Period ${period} ${formatDelta(points)} points`;
+    toastLabel = `${getClassLabel(period)} ${formatDelta(points)} points`;
   }
 
   activeEvents().push({
@@ -915,56 +941,12 @@ seasonNameInput.addEventListener("change", () => {
 });
 
 /* =========================================================
-   MANAGE CLASSES
-   Visibility is global across every championship. Hiding a
-   class never deletes its scores or historical data.
+   DASHBOARD SETTINGS
+   Class visibility and class names are managed globally.
 ========================================================= */
 
-const manageClassesModal = document.getElementById("manageClassesModal");
-const manageClassList = document.getElementById("manageClassList");
-
-function openManageClasses(){
-  manageClassList.innerHTML = "";
-  const visible = activePeriods();
-
-  PERIODS.forEach(period => {
-    const label = document.createElement("label");
-    label.className = "class-toggle";
-    label.innerHTML = `
-      <input type="checkbox" value="${period}" ${visible.includes(period) ? "checked" : ""}>
-      <span>Period ${period}</span>
-    `;
-    manageClassList.appendChild(label);
-  });
-
-  manageClassesModal.classList.add("open");
-  manageClassesModal.setAttribute("aria-hidden","false");
-}
-
-function closeManageClasses(){
-  manageClassesModal.classList.remove("open");
-  manageClassesModal.setAttribute("aria-hidden","true");
-}
-
-document.getElementById("manageClassesButton").addEventListener("click", openManageClasses);
-document.getElementById("closeManageClassesModal").addEventListener("click", closeManageClasses);
-document.getElementById("cancelManageClasses").addEventListener("click", closeManageClasses);
-manageClassesModal.addEventListener("click", event => {
-  if(event.target === manageClassesModal) closeManageClasses();
-});
-
-document.getElementById("saveManageClasses").addEventListener("click", () => {
-  const selected = [...manageClassList.querySelectorAll('input[type="checkbox"]:checked')]
-    .map(input => Number(input.value))
-    .filter(period => PERIODS.includes(period));
-
-  if(!selected.length) return showToast("Keep at least one class visible.");
-
-  state.activePeriods = PERIODS.filter(period => selected.includes(period));
-  saveState();
-  renderAll();
-  closeManageClasses();
-  showToast("Visible classes updated.");
+document.getElementById("dashboardSettingsButton").addEventListener("click", () => {
+  window.location.href = "settings.html";
 });
 
 /* =========================================================
@@ -975,6 +957,10 @@ const competitionModal = document.getElementById("competitionModal");
 const competitionRows = document.getElementById("competitionRows");
 
 function openCompetitionModal(){
+  if(!activePeriods().length){
+    return showToast("Turn on at least one class in Dashboard Settings first.");
+  }
+
   document.getElementById("competitionName").value = "";
   document.getElementById("competitionDate").value = dateKey(new Date());
   competitionRows.innerHTML = "";
@@ -984,9 +970,9 @@ function openCompetitionModal(){
     row.dataset.period = period;
     row.innerHTML = `
       <td class="rank-cell">—</td>
-      <td class="period-cell">Period ${period}</td>
-      <td><input class="game-score" type="number" step="1" placeholder="0" aria-label="Period ${period} game score"></td>
-      <td><input class="season-award" type="number" step="1" placeholder="0" aria-label="Period ${period} season points"></td>
+      <td class="period-cell">${getClassLabel(period)}</td>
+      <td><input class="game-score" type="number" step="1" placeholder="0" aria-label="${getClassLabel(period)} game score"></td>
+      <td><input class="season-award" type="number" step="1" placeholder="0" aria-label="${getClassLabel(period)} season points"></td>
     `;
     competitionRows.appendChild(row);
   });
@@ -1013,7 +999,6 @@ competitionModal.addEventListener("click", event => {
 document.addEventListener("keydown", event => {
   if(event.key !== "Escape") return;
   if(competitionModal.classList.contains("open")) closeCompetitionModal();
-  if(manageClassesModal.classList.contains("open")) closeManageClasses();
 });
 
 function readCompetitionRows(){
@@ -1056,7 +1041,7 @@ function updateCompetitionPreview(){
   }
 
   const topScore = ranked[0].gameScore;
-  const winners = ranked.filter(x => x.gameScore === topScore).map(x => `Period ${x.period}`);
+  const winners = ranked.filter(x => x.gameScore === topScore).map(x => getClassLabel(x.period));
   preview.textContent = winners.length === 1
     ? `🏆 ${winners[0]} wins with ${topScore} points.`
     : `🏆 Tie for first: ${winners.join(" & ")} with ${topScore} points.`;
@@ -1132,7 +1117,7 @@ document.getElementById("saveCompetition").addEventListener("click", () => {
 document.getElementById("backupButton").addEventListener("click", () => {
   const backup = {
     app:"BJH Scoreboard",
-    version:3,
+    version:4,
     created:new Date().toISOString(),
     state
   };
@@ -1165,19 +1150,14 @@ document.getElementById("restoreFile").addEventListener("change", event => {
       if(Array.isArray(restored.events)){
         const title = SEASON_TITLES.includes(restored.seasonName) ? restored.seasonName : DEFAULT_SEASON_TITLE;
         state = {
-          schemaVersion:3,
+          schemaVersion:4,
           activeSeason:title,
-          activePeriods:[...DEFAULT_ACTIVE_PERIODS],
           seasons:{[title]:{events:restored.events}}
         };
       }else if(restored.seasons && typeof restored.seasons === "object"){
-        const restoredActivePeriods = Array.isArray(restored.activePeriods)
-          ? restored.activePeriods.map(Number).filter(p => PERIODS.includes(p))
-          : [...DEFAULT_ACTIVE_PERIODS];
         state = {
-          schemaVersion:3,
+          schemaVersion:4,
           activeSeason:SEASON_TITLES.includes(restored.activeSeason) ? restored.activeSeason : DEFAULT_SEASON_TITLE,
-          activePeriods:restoredActivePeriods.length ? [...new Set(restoredActivePeriods)] : [...DEFAULT_ACTIVE_PERIODS],
           seasons:restored.seasons
         };
       }else{
@@ -1350,6 +1330,13 @@ function showToast(message){
 
 function initialize(){
   loadScheduleSelector();
+
+  if(window.DashboardData?.changeEvent){
+    window.addEventListener(DashboardData.changeEvent, () => {
+      renderAll();
+    });
+  }
+
   renderAll();
   updateBellCountdown();
   setInterval(updateBellCountdown,250);
