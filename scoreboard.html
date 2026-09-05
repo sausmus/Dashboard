@@ -13,6 +13,39 @@
       --gold:#f9ab00; --shadow:0 2px 8px rgba(0,0,0,.08); --radius:16px;
     }
     *{box-sizing:border-box}
+    .dashboard-back {
+  position: fixed;
+  top: 18px;
+  left: 18px;
+  z-index: 1000;
+
+  display: inline-flex;
+  align-items: center;
+
+  padding: 9px 14px;
+  border: 1px solid #dadce0;
+  border-radius: 10px;
+
+  background: #ffffff;
+  color: #1a73e8;
+
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease;
+}
+
+.dashboard-back:hover {
+  background: #e8f0fe;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
     html,body{min-height:100%}
     body{margin:0;background:var(--bg);color:var(--text);font-family:Arial,Helvetica,sans-serif}
     button,select,input{font:inherit}
@@ -216,6 +249,7 @@
   </style>
 </head>
 <body>
+  <a class="dashboard-back" href="index.html">← Dashboard</a>
   <div class="app">
     <div class="top-row">
       <div class="header-spacer"></div>
