@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard Settings</title>
+  <link rel="icon" type="image/png" href="bjh-logo.png">
+
+  <style>
+    :root {
+      --bg: #f4f6f8;
+      --card: #ffffff;
+      --text: #202124;
+      --muted: #5f6368;
+      --border: #dadce0;
+      --blue: #1a73e8;
+      --blue-light: #e8f0fe;
+      --green: #188038;
+      --red: #b3261e;
+      --shadow: 0 2px 8px rgba(0,0,0,.08);
+      --radius: 16px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      min-height: 100%;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+    }
+
+    button,
+    select,
+    input[type="checkbox"] {
+      cursor: pointer;
+    }
+
+    .app {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 28px 20px 48px;
+    }
+
+    .top-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 22px;
+    }
+
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 42px;
+      padding: 9px 14px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #fff;
+      color: var(--blue);
+      font-size: 14px;
+      font-weight: 700;
+      text-decoration: none;
+      box-shadow: 0 1px 3px rgba(0,0,0,.04);
+    }
+
+    .back-link:hover {
+      background: #f8faff;
+    }
+
+    .page-title {
+      min-width: 0;
+      text-align: right;
+    }
+
+    .page-title h1 {
+      margin: 0;
+      font-size: 28px;
+      letter-spacing: -.45px;
+    }
+
+    .page-title p {
+      margin: 5px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .panel {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 24px;
+      margin-bottom: 18px;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+
+    .section-header h2 {
+      margin: 0 0 4px;
+      font-size: 20px;
+    }
+
+    .section-header p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .class-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .class-row {
+      display: grid;
+      grid-template-columns: auto 130px minmax(180px, 1fr) auto;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #fff;
+    }
+
+    .class-row.is-hidden {
+      background: #f8f9fa;
+    }
+
+    .class-row.is-hidden .period-label,
+    .class-row.is-hidden .student-count {
+      color: #8a8f94;
+    }
+
+    .visibility-check {
+      width: 20px;
+      height: 20px;
+      accent-color: var(--blue);
+    }
+
+    .period-label {
+      font-size: 14px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .class-name-input {
+      width: 100%;
+      min-width: 0;
+      height: 40px;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      background: #fff;
+      color: var(--text);
+      font-size: 14px;
+    }
+
+    .class-name-input:focus,
+    .roster-select:focus,
+    .roster-textarea:focus {
+      outline: 3px solid rgba(26,115,232,.16);
+      border-color: var(--blue);
+    }
+
+    .student-count {
+      min-width: 82px;
+      text-align: right;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .action-row {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 18px;
+    }
+
+    .button {
+      min-height: 42px;
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 16px;
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    .button.primary {
+      background: var(--blue);
+      color: #fff;
+    }
+
+    .button.secondary {
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--text);
+    }
+
+    .button.danger {
+      border: 1px solid #efc7c3;
+      background: #fff;
+      color: var(--red);
+    }
+
+    .button:hover {
+      filter: brightness(.98);
+    }
+
+    .roster-toolbar {
+      display: grid;
+      grid-template-columns: minmax(180px, 280px) 1fr;
+      gap: 16px;
+      align-items: end;
+      margin-bottom: 14px;
+    }
+
+    .field {
+      min-width: 0;
+    }
+
+    .field label {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+    }
+
+    .roster-select {
+      width: 100%;
+      height: 42px;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      background: #fff;
+      color: var(--text);
+    }
+
+    .roster-summary {
+      min-height: 42px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .roster-textarea {
+      width: 100%;
+      min-height: 330px;
+      resize: vertical;
+      padding: 14px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #fff;
+      color: var(--text);
+      line-height: 1.5;
+      font-size: 15px;
+    }
+
+    .roster-help {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .current-class-row {
+      display: grid;
+      grid-template-columns: minmax(180px, 300px) auto;
+      gap: 12px;
+      align-items: end;
+    }
+
+    .status {
+      min-height: 22px;
+      margin-top: 10px;
+      color: var(--green);
+      font-size: 13px;
+      font-weight: 700;
+      text-align: right;
+    }
+
+    .status.error {
+      color: var(--red);
+    }
+
+    .danger-note {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+      margin: 0;
+    }
+
+    .dashboard-footer {
+      margin-top: 24px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    @media (max-width: 720px) {
+      .app {
+        padding: 20px 14px 36px;
+      }
+
+      .top-row {
+        align-items: flex-start;
+      }
+
+      .page-title h1 {
+        font-size: 23px;
+      }
+
+      .panel {
+        padding: 19px;
+      }
+
+      .class-row {
+        grid-template-columns: auto 1fr auto;
+      }
+
+      .class-name-input {
+        grid-column: 2 / -1;
+      }
+
+      .student-count {
+        grid-column: 3;
+        grid-row: 1;
+      }
+
+      .roster-toolbar,
+      .current-class-row {
+        grid-template-columns: 1fr;
+      }
+
+      .roster-summary {
+        justify-content: flex-start;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .top-row {
+        flex-direction: column;
+      }
+
+      .page-title {
+        text-align: left;
+      }
+
+      .class-row {
+        grid-template-columns: auto 1fr;
+      }
+
+      .student-count {
+        grid-column: 2;
+        text-align: left;
+      }
+
+      .class-name-input {
+        grid-column: 1 / -1;
+      }
+
+      .action-row {
+        justify-content: stretch;
+      }
+
+      .action-row .button {
+        flex: 1 1 100%;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        scroll-behavior: auto !important;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="app">
+
+    <div class="top-row">
+      <a class="back-link" href="index.html">← Dashboard</a>
+
+      <div class="page-title">
+        <h1>Dashboard Settings</h1>
+        <p>Shared classes and rosters for your Teacher Dashboard.</p>
+      </div>
+    </div>
+
+    <section class="panel">
+      <div class="section-header">
+        <div>
+          <h2>My Classes</h2>
+          <p>
+            Choose which periods are active across the dashboard. All seven periods are active by default.
+          </p>
+        </div>
+      </div>
+
+      <div id="classList" class="class-list"></div>
+
+      <div class="action-row">
+        <button id="saveClassesButton" class="button primary" type="button">Save Classes</button>
+      </div>
+
+      <div id="classesStatus" class="status" aria-live="polite"></div>
+    </section>
+
+    <section class="panel">
+      <div class="section-header">
+        <div>
+          <h2>Master Rosters</h2>
+          <p>
+            Enter student names once here. The Student Picker and future group/seating tools can use these shared rosters.
+          </p>
+        </div>
+      </div>
+
+      <div class="roster-toolbar">
+        <div class="field">
+          <label for="rosterClassSelect">Class</label>
+          <select id="rosterClassSelect" class="roster-select"></select>
+        </div>
+
+        <div id="rosterSummary" class="roster-summary"></div>
+      </div>
+
+      <textarea
+        id="rosterTextarea"
+        class="roster-textarea"
+        spellcheck="false"
+        placeholder="Enter one student name per line..."
+      ></textarea>
+
+      <div class="roster-help">
+        One student per line. Blank lines are ignored, and duplicate names are removed automatically.
+      </div>
+
+      <div class="action-row">
+        <button id="saveRosterButton" class="button primary" type="button">Save Roster</button>
+      </div>
+
+      <div id="rosterStatus" class="status" aria-live="polite"></div>
+    </section>
+
+    <section class="panel">
+      <div class="section-header">
+        <div>
+          <h2>Current Class</h2>
+          <p>
+            This will eventually let utilities open to the same class automatically.
+          </p>
+        </div>
+      </div>
+
+      <div class="current-class-row">
+        <div class="field">
+          <label for="currentClassSelect">Current Class</label>
+          <select id="currentClassSelect" class="roster-select"></select>
+        </div>
+
+        <button id="saveCurrentClassButton" class="button primary" type="button">
+          Set Current Class
+        </button>
+      </div>
+
+      <div id="currentClassStatus" class="status" aria-live="polite"></div>
+    </section>
+
+    <section class="panel">
+      <div class="section-header">
+        <div>
+          <h2>Shared Data</h2>
+          <p>
+            These settings currently stay in this browser. Google Drive sync can replace this storage layer later.
+          </p>
+        </div>
+      </div>
+
+      <p class="danger-note">
+        Resetting shared data restores Periods 1–7 as active and permanently clears all master rosters saved on this device.
+      </p>
+
+      <div class="action-row">
+        <button id="resetButton" class="button danger" type="button">Reset Shared Data</button>
+      </div>
+
+      <div id="resetStatus" class="status" aria-live="polite"></div>
+    </section>
+
+    <footer class="dashboard-footer">
+      Teacher Dashboard
+    </footer>
+
+  </main>
+
+  <script src="shared/dashboard-data.js"></script>
+  <script>
+    (() => {
+      "use strict";
+
+      const classList = document.getElementById("classList");
+      const rosterClassSelect = document.getElementById("rosterClassSelect");
+      const rosterTextarea = document.getElementById("rosterTextarea");
+      const rosterSummary = document.getElementById("rosterSummary");
+      const currentClassSelect = document.getElementById("currentClassSelect");
+
+      const classesStatus = document.getElementById("classesStatus");
+      const rosterStatus = document.getElementById("rosterStatus");
+      const currentClassStatus = document.getElementById("currentClassStatus");
+      const resetStatus = document.getElementById("resetStatus");
+
+      const saveClassesButton = document.getElementById("saveClassesButton");
+      const saveRosterButton = document.getElementById("saveRosterButton");
+      const saveCurrentClassButton = document.getElementById("saveCurrentClassButton");
+      const resetButton = document.getElementById("resetButton");
+
+      function showStatus(element, message, isError = false) {
+        element.textContent = message;
+        element.classList.toggle("error", isError);
+
+        window.clearTimeout(element._clearTimer);
+        element._clearTimer = window.setTimeout(() => {
+          element.textContent = "";
+          element.classList.remove("error");
+        }, 3200);
+      }
+
+      function countRosterLines(text) {
+        const seen = new Set();
+
+        return String(text)
+          .split(/\r?\n/)
+          .map(name => name.trim().replace(/\s+/g, " "))
+          .filter(name => {
+            if (!name) return false;
+
+            const key = name.toLocaleLowerCase();
+            if (seen.has(key)) return false;
+
+            seen.add(key);
+            return true;
+          }).length;
+      }
+
+      function renderClasses() {
+        const classes = DashboardData.getClasses();
+        classList.innerHTML = "";
+
+        for (const item of classes) {
+          const row = document.createElement("div");
+          row.className = "class-row";
+          row.dataset.classId = item.id;
+          row.classList.toggle("is-hidden", !item.active);
+
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.className = "visibility-check";
+          checkbox.checked = item.active;
+          checkbox.setAttribute("aria-label", `Show ${item.name}`);
+          checkbox.dataset.role = "active";
+
+          checkbox.addEventListener("change", () => {
+            row.classList.toggle("is-hidden", !checkbox.checked);
+          });
+
+          const periodLabel = document.createElement("div");
+          periodLabel.className = "period-label";
+          periodLabel.textContent = `Period ${item.id}`;
+
+          const nameInput = document.createElement("input");
+          nameInput.type = "text";
+          nameInput.className = "class-name-input";
+          nameInput.value = item.name;
+          nameInput.maxLength = 60;
+          nameInput.dataset.role = "name";
+          nameInput.setAttribute("aria-label", `Display name for Period ${item.id}`);
+
+          const count = document.createElement("div");
+          count.className = "student-count";
+          count.textContent = `${item.students.length} student${item.students.length === 1 ? "" : "s"}`;
+
+          row.append(checkbox, periodLabel, nameInput, count);
+          classList.appendChild(row);
+        }
+      }
+
+      function renderSelects(preferredRosterId) {
+        const allClasses = DashboardData.getClasses();
+        const activeClasses = allClasses.filter(item => item.active);
+
+        const previousRosterId =
+          preferredRosterId ||
+          rosterClassSelect.value ||
+          DashboardData.getCurrentClassId() ||
+          "1";
+
+        rosterClassSelect.innerHTML = "";
+
+        for (const item of allClasses) {
+          const option = document.createElement("option");
+          option.value = item.id;
+          option.textContent = item.active ? item.name : `${item.name} (Hidden)`;
+          rosterClassSelect.appendChild(option);
+        }
+
+        if (allClasses.some(item => item.id === previousRosterId)) {
+          rosterClassSelect.value = previousRosterId;
+        }
+
+        currentClassSelect.innerHTML = "";
+
+        for (const item of activeClasses) {
+          const option = document.createElement("option");
+          option.value = item.id;
+          option.textContent = item.name;
+          currentClassSelect.appendChild(option);
+        }
+
+        const currentId = DashboardData.getCurrentClassId();
+
+        if (activeClasses.some(item => item.id === currentId)) {
+          currentClassSelect.value = currentId;
+        } else if (activeClasses.length) {
+          currentClassSelect.value = activeClasses[0].id;
+        }
+
+        saveCurrentClassButton.disabled = activeClasses.length === 0;
+      }
+
+      function loadSelectedRoster() {
+        const classId = rosterClassSelect.value;
+        const item = DashboardData.getClass(classId);
+
+        if (!item) {
+          rosterTextarea.value = "";
+          rosterSummary.textContent = "";
+          return;
+        }
+
+        rosterTextarea.value = item.students.join("\n");
+        updateRosterSummary();
+      }
+
+      function updateRosterSummary() {
+        const count = countRosterLines(rosterTextarea.value);
+        rosterSummary.textContent = `${count} student${count === 1 ? "" : "s"}`;
+      }
+
+      function saveClasses() {
+        try {
+          const rows = [...classList.querySelectorAll(".class-row")];
+
+          for (const row of rows) {
+            const id = row.dataset.classId;
+            const active = row.querySelector('[data-role="active"]').checked;
+            const name = row.querySelector('[data-role="name"]').value.trim();
+
+            DashboardData.updateClass(id, {
+              active,
+              name: name || `Period ${id}`
+            });
+          }
+
+          renderClasses();
+          renderSelects(rosterClassSelect.value);
+          loadSelectedRoster();
+
+          showStatus(classesStatus, "Classes saved.");
+        } catch (error) {
+          console.error(error);
+          showStatus(classesStatus, "Classes could not be saved.", true);
+        }
+      }
+
+      function saveRoster() {
+        try {
+          const classId = rosterClassSelect.value;
+          const students = rosterTextarea.value.split(/\r?\n/);
+
+          DashboardData.saveRoster(classId, students);
+
+          renderClasses();
+          renderSelects(classId);
+          loadSelectedRoster();
+
+          showStatus(rosterStatus, "Roster saved.");
+        } catch (error) {
+          console.error(error);
+          showStatus(rosterStatus, "Roster could not be saved.", true);
+        }
+      }
+
+      function saveCurrentClass() {
+        try {
+          if (!currentClassSelect.value) {
+            showStatus(currentClassStatus, "Turn on at least one class first.", true);
+            return;
+          }
+
+          DashboardData.setCurrentClass(currentClassSelect.value);
+          showStatus(
+            currentClassStatus,
+            `${DashboardData.getCurrentClass()?.name ?? "Current class"} selected.`
+          );
+        } catch (error) {
+          console.error(error);
+          showStatus(currentClassStatus, error.message || "Current class could not be saved.", true);
+        }
+      }
+
+      function resetSharedData() {
+        const confirmed = window.confirm(
+          "Reset all shared Dashboard data on this device? This will clear every master roster."
+        );
+
+        if (!confirmed) return;
+
+        DashboardData.resetSharedData();
+
+        renderClasses();
+        renderSelects("1");
+        loadSelectedRoster();
+
+        showStatus(resetStatus, "Shared data reset.");
+      }
+
+      rosterClassSelect.addEventListener("change", loadSelectedRoster);
+      rosterTextarea.addEventListener("input", updateRosterSummary);
+
+      saveClassesButton.addEventListener("click", saveClasses);
+      saveRosterButton.addEventListener("click", saveRoster);
+      saveCurrentClassButton.addEventListener("click", saveCurrentClass);
+      resetButton.addEventListener("click", resetSharedData);
+
+      renderClasses();
+      renderSelects();
+      loadSelectedRoster();
+    })();
+  </script>
+</body>
+</html>
