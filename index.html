@@ -180,8 +180,64 @@
       transition: transform .16s ease;
     }
 
-    .utility-card:hover .open-arrow {
+    .utility-card:hover .open-arrow,
+    .settings-card:hover .open-arrow {
       transform: translateX(4px);
+    }
+
+    /* SHARED DASHBOARD SETTINGS */
+    .settings-card {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      min-height: 126px;
+      background: var(--card);
+      border: 1px solid transparent;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 22px 24px;
+      transition:
+        transform .16s ease,
+        box-shadow .16s ease,
+        border-color .16s ease;
+    }
+
+    .settings-card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-hover);
+      border-color: #cbd8ee;
+    }
+
+    .settings-card:focus-visible {
+      outline: 3px solid rgba(26,115,232,.25);
+      outline-offset: 3px;
+    }
+
+    .settings-card .utility-icon {
+      margin: 0;
+      flex: 0 0 auto;
+    }
+
+    .settings-copy {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .settings-copy .utility-title {
+      font-size: 19px;
+      margin-bottom: 5px;
+    }
+
+    .settings-open {
+      flex: 0 0 auto;
+      color: var(--blue);
+      font-size: 14px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      white-space: nowrap;
     }
 
     /* FOOTER */
@@ -225,6 +281,32 @@
         min-height: 205px;
         padding: 20px;
       }
+
+      .settings-card {
+        grid-column: auto;
+        align-items: flex-start;
+        min-height: 0;
+        padding: 20px;
+      }
+
+      .settings-open {
+        margin-left: auto;
+      }
+    }
+
+    @media (max-width: 520px) {
+      .settings-card {
+        flex-wrap: wrap;
+      }
+
+      .settings-copy {
+        flex-basis: calc(100% - 72px);
+      }
+
+      .settings-open {
+        width: 100%;
+        margin-left: 72px;
+      }
     }
 
     @media (max-width: 410px) {
@@ -240,6 +322,7 @@
 
     @media (prefers-reduced-motion: reduce) {
       .utility-card,
+      .settings-card,
       .open-arrow {
         transition: none;
       }
@@ -334,6 +417,27 @@
         </p>
         <div class="open-row">
           Open Scoreboard <span class="open-arrow">→</span>
+        </div>
+      </a>
+
+      <!-- DASHBOARD SETTINGS -->
+      <a class="settings-card" href="settings.html">
+        <div class="utility-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21H9.6v-.1a1.7 1.7 0 0 0-.4-1.1 1.7 1.7 0 0 0-1-.6 1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 3.8 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H2V9.6h.1a1.7 1.7 0 0 0 1.1-.4 1.7 1.7 0 0 0 .6-1 1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 8.2 3.8a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V2h4v.1a1.7 1.7 0 0 0 .4 1.1 1.7 1.7 0 0 0 1 .6 1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 20.2 8.2a1.7 1.7 0 0 0 .6 1 1.7 1.7 0 0 0 1.1.4h.1v4h-.1a1.7 1.7 0 0 0-1.1.4 1.7 1.7 0 0 0-.6 1Z"></path>
+          </svg>
+        </div>
+
+        <div class="settings-copy">
+          <h2 class="utility-title">Dashboard Settings</h2>
+          <p class="utility-description">
+            Manage shared classes, visible periods, and master student rosters for the entire dashboard.
+          </p>
+        </div>
+
+        <div class="settings-open">
+          Open Settings <span class="open-arrow">→</span>
         </div>
       </a>
 
